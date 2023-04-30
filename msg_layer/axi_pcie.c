@@ -62,6 +62,8 @@ static dma_addr_t h2c_poll_bus;
 static void *base_addr; 
 static dma_addr_t base_dma;
 static dma_addr_t iommu_handle;
+u64 st_pollthrd, et_pollthrd, avg_pollthrd, st_procmsg, et_procmsg, avg_procmsg;
+int cnt_pollthrd=1, cnt_procmsg=1;
 
 static struct iommu_domain *domain; 
 
@@ -333,8 +335,6 @@ static int poll_dma(void* arg0)
     bool was_frozen;
     int i;
     int recv_index = 0, index = 0, tmp = 0;
-    u64 st_pollthrd, et_pollthrd, avg_pollthrd, st_procmsg, et_procmsg, avg_procmsg;
-    int cnt_pollthrd=1, cnt_procmsg=1;
     //printk("In poll_dma\n");
     while (!kthread_freezable_should_stop(&was_frozen)) {
 
