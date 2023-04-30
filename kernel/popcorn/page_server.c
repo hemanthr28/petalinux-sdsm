@@ -1631,6 +1631,8 @@ static int __handle_localfault_at_remote(struct vm_fault *vmf)
 	unsigned long addr = vmf->address & PAGE_MASK;
 	bool present;
 
+	printk("In __handle_localfault_at_remote\n");
+
 	if (anon_vma_prepare(vmf->vma)) {
 		BUG_ON("Cannot prepare vma for anonymous page");
 		pte_unmap(vmf->pte);
@@ -1783,6 +1785,8 @@ static int __handle_localfault_at_origin(struct vm_fault *vmf)
 	struct fault_handle *fh;
 	bool leader;
 
+	printk("In __handle_localfault_at_origin");
+
 	ptl = pte_lockptr(vmf->vma->vm_mm, vmf->pmd);
 	spin_lock(ptl);
 
@@ -1902,6 +1906,8 @@ int page_server_handle_pte_fault(struct vm_fault *vmf)
 	int ret = 0;
 	u64 st_lclflt_rmt, et_lclflt_rmt, avg_lclflt_rmt;
 	int cnt_lclflt_rmt=1; 
+
+	printk("In page_server_handle_pte_fault\n");
 
 	might_sleep();
 
