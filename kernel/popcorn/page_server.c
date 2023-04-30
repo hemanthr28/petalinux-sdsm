@@ -1053,9 +1053,16 @@ static remote_page_response_t *__fetch_page_from_origin(struct task_struct *tsk,
 	remote_page_response_t *rp;
 	struct wait_station *ws = get_wait_station(tsk);
 	struct pcn_kmsg_rdma_handle *rh;
+	u64 st_rprrsp, et_rprrsp, avg_rprrsp, st_rpr, et_rpr, avg_rpr;
+	int cnt_rprrsp=1, cnt_rpr=1;
 
+	st_rpr = ktime_get_ns();
 	__request_remote_page(tsk, tsk->origin_nid, tsk->origin_pid,
 			addr, fault_flags, ws->id, &rh);
+	et_rpr = ktime_get_ns();
+	avg_rpr += ktime_to_ns(ktime_sub(et_rpr, st_rpr));
+	printk("Time to request remote page = %lld ns\n", avg_rpr/cnt_rpr);
+	cnt_rpr += 1;
 
 	rp = wait_at_station(ws);
 	if (rp->result == 0) {
@@ -1063,7 +1070,12 @@ static remote_page_response_t *__fetch_page_from_origin(struct task_struct *tsk,
 		if (TRANSFER_PAGE_WITH_RDMA) {
 			copy_to_user_page(vma, page, addr, paddr, rh->addr, PAGE_SIZE);
 		} else {
+			st_rprrsp = ktime_get_ns();
 			copy_to_user_page(vma, page, addr, paddr, rp->page, PAGE_SIZE);
+			et_rprrsp = ktime_get_ns();
+			avg_rprrsp += ktime_to_ns(ktime_sub(et_rprrsp, st_rprrsp));
+			printk("Time to copy to usr = %lld ns\n", avg_rprrsp/cnt_rprrsp);
+			cnt_rprrsp += 1;
 		}
 		kunmap(page);
 		flush_dcache_page(page);
@@ -1888,6 +1900,8 @@ int page_server_handle_pte_fault(struct vm_fault *vmf)
 {
 	unsigned long addr = vmf->address & PAGE_MASK;
 	int ret = 0;
+	u64 st_lclflt_rmt, et_lclflt_rmt, avg_lclflt_rmt;
+	int cnt_lclflt_rmt=1; 
 
 	might_sleep();
 
@@ -1930,7 +1944,12 @@ int page_server_handle_pte_fault(struct vm_fault *vmf)
 
 	if (!pte_is_present(vmf->orig_pte)) {
 		/* Remote page fault */
+		st_lclflt_rmt = ktime_get_ns();
 		ret = __handle_localfault_at_remote(vmf);
+		et_lclflt_rmt = ktime_get_ns();
+		avg_lclflt_rmt += ktime_to_ns(ktime_sub(et_lclflt_rmt, st_lclflt_rmt));
+		printk("Time taken for rmtflt at remote = %lld ns\n", avg_lclflt_rmt/cnt_lclflt_rmt);
+		cnt_lclflt_rmt += 1;
 		goto out;
 	}
 
