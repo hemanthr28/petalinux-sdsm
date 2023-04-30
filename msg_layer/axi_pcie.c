@@ -364,7 +364,7 @@ static int poll_dma(void* arg0)
             st_procmsg = ktime_get_ns();
             process_message(recv_index);
             et_procmsg = ktime_get_ns();
-            avg_procmsg += ktime_get_ns(ktime_sub(et_procmsg, st_procmsg));
+            avg_procmsg += ktime_to_ns(ktime_sub(et_procmsg, st_procmsg));
             printk("Time to process kmg = %lld ns\n", avg_procmsg/cnt_procmsg);
             cnt_procmsg += 1;
 
@@ -549,7 +549,7 @@ int pcie_axi_kmsg_post(int nid, struct pcn_kmsg_message *msg, size_t size)
         }
         __raw_writeq(0xd010d010, x86_host_addr+(1023*8)); //Write the last 2 bytes with a patter to indicate the polling thread.
         et_post = ktime_get_ns();
-        avg_post += ktime_get_ns(ktime_sub(et_post, st_post));
+        avg_post += ktime_to_ns(ktime_sub(et_post, st_post));
         printk("Time to post msg = %lld ns\n", avg_post/cnt_post);
         cnt_post += 1;
 
@@ -585,7 +585,7 @@ int pcie_axi_kmsg_send(int nid, struct pcn_kmsg_message *msg, size_t size)//0,
         }
     __raw_writeq(0xd010d010, x86_host_addr+(1023*8)); //Write the last 2 bytes with a patter to indicate the polling thread.
     et_send = ktime_get_ns();
-    avg_send += ktime_get_ns(ktime_sub(et_send, st_send));
+    avg_send += ktime_to_ns(ktime_sub(et_send, st_send));
     printk("Time to post msg = %lld ns\n", avg_send/cnt_send);
     cnt_send += 1;
     spin_unlock(&pcie_axi_lock);
