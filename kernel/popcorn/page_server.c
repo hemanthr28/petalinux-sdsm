@@ -1904,10 +1904,11 @@ int page_server_handle_pte_fault(struct vm_fault *vmf)
 {
 	unsigned long addr = vmf->address & PAGE_MASK;
 	int ret = 0;
-	u64 st_lclflt_rmt, et_lclflt_rmt, avg_lclflt_rmt;
-	int cnt_lclflt_rmt=1; 
+	u64 st_lclflt_rmt, et_lclflt_rmt, avg_lclflt_rmt, st_pte, et_pte, avg_pte;
+	int cnt_lclflt_rmt=1, cnt_pte=1; 
 
-	printk("In page_server_handle_pte_fault\n");
+	//printk("In page_server_handle_pte_fault\n");
+	st_pte = ktime_get_ns();
 
 	might_sleep();
 
@@ -1921,7 +1922,7 @@ int page_server_handle_pte_fault(struct vm_fault *vmf)
 	 * Thread at the origin
 	 */
 	if (!current->at_remote) {
-		printk("Calling lclflt at origin\n");
+		//printk("Calling lclflt at origin\n");
 		ret = __handle_localfault_at_origin(vmf);
 		goto out;
 	}
@@ -1951,19 +1952,19 @@ int page_server_handle_pte_fault(struct vm_fault *vmf)
 
 	if (!pte_is_present(vmf->orig_pte)) {
 		/* Remote page fault */
-		printk("Calling lclflt at remote\n");
+		//printk("Calling lclflt at remote\n");
 		st_lclflt_rmt = ktime_get_ns();
 		ret = __handle_localfault_at_remote(vmf);
 		et_lclflt_rmt = ktime_get_ns();
 		avg_lclflt_rmt += ktime_to_ns(ktime_sub(et_lclflt_rmt, st_lclflt_rmt));
-		printk("Time taken for lclflt at remote = %lld ns\n", avg_lclflt_rmt/cnt_lclflt_rmt);
+		//printk("Time taken for lclflt at remote = %lld ns\n", avg_lclflt_rmt/cnt_lclflt_rmt);
 		cnt_lclflt_rmt += 1;
 		goto out;
 	}
 
 	if ((vmf->vma->vm_flags & VM_WRITE) &&
 			fault_for_write(vmf->flags) && !pte_write(vmf->orig_pte)) {
-		printk("Calling lclflt at remote wr_prot\n");
+		//printk("Calling lclflt at remote wr_prot\n");
 		/* wr-protected for keeping page consistency */
 		ret = __handle_localfault_at_remote(vmf);
 		goto out;
@@ -1977,7 +1978,10 @@ out:
 	trace_pgfault(my_nid, current->pid,
 			fault_for_write(vmf->flags) ? 'W' : 'R',
 			instruction_pointer(current_pt_regs()), addr, ret);
-
+	et_pte = ktime_get_ns();
+	avg_pte += ktime_to_ns(ktime_sub(et_pte, st_pte));
+	printk("PTE fault time = %lld ns\n", avg_pte/cnt_pte);
+	cnt_pte += 1;
 	return ret;
 }
 
