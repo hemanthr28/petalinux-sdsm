@@ -339,14 +339,14 @@ static int poll_dma(void* arg0)
     while (!kthread_freezable_should_stop(&was_frozen)) {
 
         //rcu_read_lock();
-        st_pollthrd = ktime_get_ns();
+        //st_pollthrd = ktime_get_ns();
         if ((*((uint64_t *)(recv_queue->work_list[tmp]->addr+(1022*8))) == 0xd010d010) ||
             (*((uint64_t *)(recv_queue->work_list[tmp]->addr+(1023*8))) == 0xd010d010)){ //possible performance improvement here!
             
-            et_pollthrd = ktime_get_ns();
-            avg_pollthrd += ktime_to_ns(ktime_sub(et_pollthrd, st_pollthrd));
-            printk("Time to detect the msg = %lld ns\n", avg_pollthrd/cnt_pollthrd);
-            cnt_pollthrd += 1;
+            //et_pollthrd = ktime_get_ns();
+            //avg_pollthrd += ktime_to_ns(ktime_sub(et_pollthrd, st_pollthrd));
+            //printk("Time to detect the msg = %lld ns\n", avg_pollthrd/cnt_pollthrd);
+            //cnt_pollthrd += 1;
 
             *(uint64_t *)((recv_queue->work_list[tmp]->addr)+(1022*8)) = 0x0;
             *(uint64_t *)((recv_queue->work_list[tmp]->addr)+(1023*8)) = 0x0;
@@ -361,14 +361,14 @@ static int poll_dma(void* arg0)
             if (recv_queue->size == recv_queue->nr_entries) {
                 recv_queue->size = 0;
             }
-            st_procmsg = ktime_get_ns();
+            //st_procmsg = ktime_get_ns();
             process_message(recv_index);
-            et_procmsg = ktime_get_ns();
-            avg_procmsg += ktime_to_ns(ktime_sub(et_procmsg, st_procmsg));
-            printk("Time to process kmg = %lld ns\n", avg_procmsg/cnt_procmsg);
-            cnt_procmsg += 1;
+            //et_procmsg = ktime_get_ns();
+            //avg_procmsg += ktime_to_ns(ktime_sub(et_procmsg, st_procmsg));
+            //printk("Time to process kmg = %lld ns\n", avg_procmsg/cnt_procmsg);
+            //cnt_procmsg += 1;
 
-            printk("Processed popcorn message.\n");
+            //printk("Processed popcorn message.\n");
         } else if (h2c_desc_complete != 0) {
             no_of_messages += 1;
             h2c_desc_complete = 0;
@@ -540,7 +540,7 @@ int pcie_axi_kmsg_post(int nid, struct pcn_kmsg_message *msg, size_t size)
     //printk("In post\n");
     if (radix_tree_lookup(&send_tree, (unsigned long)((unsigned long *)msg))) {
         spin_lock(&pcie_axi_lock);
-        st_post = ktime_get_ns();
+        //st_post = ktime_get_ns();
         for(i=0; i<((FDSM_MSG_SIZE/8)-1); i++){
             //writeq(*(u64 *)(radix_tree_lookup(&send_tree, (unsigned long)((unsigned long *)msg))+(i*8)), (x86_host_addr + (i*8)));
             __raw_writeq(*(u64 *)(radix_tree_lookup(&send_tree, (unsigned long)((unsigned long *)msg))+(i*8)), (x86_host_addr + (i*8)));
@@ -548,10 +548,10 @@ int pcie_axi_kmsg_post(int nid, struct pcn_kmsg_message *msg, size_t size)
             //writeq(*(dma_addr_pntr+(i*8)), x86_host_addr + (i*8));
         }
         __raw_writeq(0xd010d010, x86_host_addr+(1023*8)); //Write the last 2 bytes with a patter to indicate the polling thread.
-        et_post = ktime_get_ns();
-        avg_post += ktime_to_ns(ktime_sub(et_post, st_post));
-        printk("Time to post msg = %lld ns\n", avg_post/cnt_post);
-        cnt_post += 1;
+        //et_post = ktime_get_ns();
+        //avg_post += ktime_to_ns(ktime_sub(et_post, st_post));
+        //printk("Time to post msg = %lld ns\n", avg_post/cnt_post);
+        //cnt_post += 1;
 
         spin_unlock(&pcie_axi_lock);
         //printk("Data Sent\n");
@@ -577,17 +577,17 @@ int pcie_axi_kmsg_send(int nid, struct pcn_kmsg_message *msg, size_t size)//0,
 
     work->done = &done;
     spin_lock(&pcie_axi_lock);
-    st_send = ktime_get_ns();
+    //st_send = ktime_get_ns();
     for(i=0; i<((FDSM_MSG_SIZE/8)-1); i++){ 
             //writeq(*(u64 *)((work->addr)+(i*8)), (x86_host_addr+(i*8)));
             __raw_writeq(*(u64 *)((work->addr)+(i*8)), (x86_host_addr+(i*8)));
             //udelay(2);
         }
     __raw_writeq(0xd010d010, x86_host_addr+(1023*8)); //Write the last 2 bytes with a patter to indicate the polling thread.
-    et_send = ktime_get_ns();
-    avg_send += ktime_to_ns(ktime_sub(et_send, st_send));
-    printk("Time to post msg = %lld ns\n", avg_send/cnt_send);
-    cnt_send += 1;
+    //et_send = ktime_get_ns();
+    //avg_send += ktime_to_ns(ktime_sub(et_send, st_send));
+    //printk("Time to post msg = %lld ns\n", avg_send/cnt_send);
+    //cnt_send += 1;
     spin_unlock(&pcie_axi_lock);
     //printk("Message sent\n");
     h2c_desc_complete = 1;
