@@ -40,6 +40,11 @@
 
 #include "trace_events.h"
 
+u64 st_lclflt_rmt, et_lclflt_rmt, avg_lclflt_rmt, st_pte, et_pte, avg_pte;
+int cnt_lclflt_rmt=1, cnt_pte=1;
+u64 st_rprrsp, et_rprrsp, avg_rprrsp, st_rpr, et_rpr, avg_rpr;
+int cnt_rprrsp=1, cnt_rpr=1;
+
 inline void page_server_start_mm_fault(unsigned long address)
 {
 #ifdef CONFIG_POPCORN_STAT_PGFAULTS
@@ -1053,8 +1058,6 @@ static remote_page_response_t *__fetch_page_from_origin(struct task_struct *tsk,
 	remote_page_response_t *rp;
 	struct wait_station *ws = get_wait_station(tsk);
 	struct pcn_kmsg_rdma_handle *rh;
-	u64 st_rprrsp, et_rprrsp, avg_rprrsp, st_rpr, et_rpr, avg_rpr;
-	int cnt_rprrsp=1, cnt_rpr=1;
 
 	st_rpr = ktime_get_ns();
 	__request_remote_page(tsk, tsk->origin_nid, tsk->origin_pid,
@@ -1631,7 +1634,7 @@ static int __handle_localfault_at_remote(struct vm_fault *vmf)
 	unsigned long addr = vmf->address & PAGE_MASK;
 	bool present;
 
-	printk("In __handle_localfault_at_remote\n");
+	//printk("In __handle_localfault_at_remote\n");
 
 	if (anon_vma_prepare(vmf->vma)) {
 		BUG_ON("Cannot prepare vma for anonymous page");
@@ -1785,7 +1788,7 @@ static int __handle_localfault_at_origin(struct vm_fault *vmf)
 	struct fault_handle *fh;
 	bool leader;
 
-	printk("In __handle_localfault_at_origin");
+	//printk("In __handle_localfault_at_origin");
 
 	ptl = pte_lockptr(vmf->vma->vm_mm, vmf->pmd);
 	spin_lock(ptl);
@@ -1903,12 +1906,10 @@ out_wakeup:
 int page_server_handle_pte_fault(struct vm_fault *vmf)
 {
 	unsigned long addr = vmf->address & PAGE_MASK;
-	int ret = 0;
-	u64 st_lclflt_rmt, et_lclflt_rmt, avg_lclflt_rmt, st_pte, et_pte, avg_pte;
-	int cnt_lclflt_rmt=1, cnt_pte=1; 
+	int ret = 0; 
 
 	//printk("In page_server_handle_pte_fault\n");
-	st_pte = ktime_get_ns();
+	//st_pte = ktime_get_ns();
 
 	might_sleep();
 
@@ -1978,10 +1979,10 @@ out:
 	trace_pgfault(my_nid, current->pid,
 			fault_for_write(vmf->flags) ? 'W' : 'R',
 			instruction_pointer(current_pt_regs()), addr, ret);
-	et_pte = ktime_get_ns();
-	avg_pte += ktime_to_ns(ktime_sub(et_pte, st_pte));
-	printk("PTE fault time = %lld ns\n", avg_pte/cnt_pte);
-	cnt_pte += 1;
+	//et_pte = ktime_get_ns();
+	//avg_pte += ktime_to_ns(ktime_sub(et_pte, st_pte));
+	//printk("PTE fault time = %lld ns\n", avg_pte/cnt_pte);
+	//cnt_pte += 1;
 	return ret;
 }
 
