@@ -1080,7 +1080,7 @@ static remote_page_response_t *__fetch_page_from_origin(struct task_struct *tsk,
 			copy_to_user_page(vma, page, addr, paddr, rh->addr, PAGE_SIZE);
 		} else {
 			st_rprrsp = ktime_get_ns();
-			py_to_user_page(vma, page, addr, paddr, rp->page, PAGE_SIZE);
+			copy_to_user_page(vma, page, addr, paddr, rp->page, PAGE_SIZE);
 			et_rprrsp = ktime_get_ns();
 			avg_rprrsp += ktime_to_ns(ktime_sub(et_rprrsp, st_rprrsp));
 			printk("Time to copy to usr = %lld ns\n", avg_rprrsp/cnt_rprrsp);
