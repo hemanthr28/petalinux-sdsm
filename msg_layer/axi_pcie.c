@@ -339,14 +339,14 @@ static int poll_dma(void* arg0)
     while (!kthread_freezable_should_stop(&was_frozen)) {
 
         //rcu_read_lock();
-        //st_pollthrd = ktime_get_ns();
+        st_pollthrd = ktime_get_ns();
         if ((*((uint64_t *)(recv_queue->work_list[tmp]->addr+(1022*8))) == 0xd010d010) ||
             (*((uint64_t *)(recv_queue->work_list[tmp]->addr+(1023*8))) == 0xd010d010)){ //possible performance improvement here!
             
-            //et_pollthrd = ktime_get_ns();
-            //avg_pollthrd += ktime_to_ns(ktime_sub(et_pollthrd, st_pollthrd));
-            //printk("Time to detect the msg = %lld ns\n", avg_pollthrd/cnt_pollthrd);
-            //cnt_pollthrd += 1;
+            et_pollthrd = ktime_get_ns();
+            avg_pollthrd += ktime_to_ns(ktime_sub(et_pollthrd, st_pollthrd));
+            printk("Time to detect the msg = %lld ns\n", avg_pollthrd/cnt_pollthrd);
+            cnt_pollthrd += 1;
 
             *(uint64_t *)((recv_queue->work_list[tmp]->addr)+(1022*8)) = 0x0;
             *(uint64_t *)((recv_queue->work_list[tmp]->addr)+(1023*8)) = 0x0;

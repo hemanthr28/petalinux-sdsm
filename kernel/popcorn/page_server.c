@@ -43,7 +43,8 @@
 u64 st_lclflt_rmt, et_lclflt_rmt, avg_lclflt_rmt, st_pte, et_pte, avg_pte;
 int cnt_lclflt_rmt=1, cnt_pte=1;
 u64 st_rprrsp, et_rprrsp, avg_rprrsp, st_rpr, et_rpr, avg_rpr;
-int cnt_rprrsp=1, cnt_rpr=1;
+int cnt_rprrsp=1, cnt_rpr=1, cnt_cmpl=1;
+u64 st_cmpl, et_cmpl, avg_cmpl;
 
 inline void page_server_start_mm_fault(unsigned long address)
 {
@@ -1003,10 +1004,15 @@ static int handle_remote_page_response(struct pcn_kmsg_message *msg)
 	PGPRINTK("  [%d] <-[%d/%d] %lx %x\n",
 			ws->pid, res->remote_pid, PCN_KMSG_FROM_NID(res),
 			res->addr, res->result);
+	st_cmpl = ktime_get_ns();
 	ws->private = res;
 
 	if (atomic_dec_and_test(&ws->pendings_count))
 		complete(&ws->pendings);
+	et_cmpl = ktime_get_ns();
+	avg_cmpl += ktime_to_ns(ktime_sub(et_cmpl, st_cmpl));
+	printk("Time to completion = %lld ns\n", avg_cmpl/cnt_cmpl);
+	cnt_cmpl += 1;
 	return 0;
 }
 
@@ -1059,13 +1065,13 @@ static remote_page_response_t *__fetch_page_from_origin(struct task_struct *tsk,
 	struct wait_station *ws = get_wait_station(tsk);
 	struct pcn_kmsg_rdma_handle *rh;
 
-	//st_rpr = ktime_get_ns();
+	st_rpr = ktime_get_ns();
 	__request_remote_page(tsk, tsk->origin_nid, tsk->origin_pid,
 			addr, fault_flags, ws->id, &rh);
-	//et_rpr = ktime_get_ns();
-	//avg_rpr += ktime_to_ns(ktime_sub(et_rpr, st_rpr));
-	//printk("Time to request remote page = %lld ns\n", avg_rpr/cnt_rpr);
-	//cnt_rpr += 1;
+	et_rpr = ktime_get_ns();
+	avg_rpr += ktime_to_ns(ktime_sub(et_rpr, st_rpr));
+	printk("Time to request remote page = %lld ns\n", avg_rpr/cnt_rpr);
+	cnt_rpr += 1;
 
 	rp = wait_at_station(ws);
 	if (rp->result == 0) {
@@ -1073,12 +1079,12 @@ static remote_page_response_t *__fetch_page_from_origin(struct task_struct *tsk,
 		if (TRANSFER_PAGE_WITH_RDMA) {
 			copy_to_user_page(vma, page, addr, paddr, rh->addr, PAGE_SIZE);
 		} else {
-			//st_rprrsp = ktime_get_ns();
-			copy_to_user_page(vma, page, addr, paddr, rp->page, PAGE_SIZE);
-			//et_rprrsp = ktime_get_ns();
-			//avg_rprrsp += ktime_to_ns(ktime_sub(et_rprrsp, st_rprrsp));
-			//printk("Time to copy to usr = %lld ns\n", avg_rprrsp/cnt_rprrsp);
-			//cnt_rprrsp += 1;
+			st_rprrsp = ktime_get_ns();
+			py_to_user_page(vma, page, addr, paddr, rp->page, PAGE_SIZE);
+			et_rprrsp = ktime_get_ns();
+			avg_rprrsp += ktime_to_ns(ktime_sub(et_rprrsp, st_rprrsp));
+			printk("Time to copy to usr = %lld ns\n", avg_rprrsp/cnt_rprrsp);
+			cnt_rprrsp += 1;
 		}
 		kunmap(page);
 		flush_dcache_page(page);
