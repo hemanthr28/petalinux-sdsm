@@ -255,6 +255,7 @@ static void __update_recv_index(queue_tr *q, int i)
 
     writeq(0x00000000fefefefe, x86_host_addr); //Reset the physical address
     writeq(q->work_list[i]->dma_addr, x86_host_addr); //Update the physical address with next sector address of recv Q
+    //memset(q->work_list[i]->addr, 0, 8192);
 }
 
 static int __get_recv_index(queue_tr *q)
@@ -297,10 +298,10 @@ static int poll_dma(void* arg0)
     while (!kthread_freezable_should_stop(&was_frozen)) {
 
         //rcu_read_lock();
-        if ((*((uint64_t *)(recv_queue->work_list[tmp]->addr+(1022*8))) == 0xd010d010)){//} ||
-            //(*((uint64_t *)(recv_queue->work_list[tmp]->addr+(1023*8))) == 0xd010d010)){ //possible performance improvement here!
+        if ((*((uint64_t *)(recv_queue->work_list[tmp]->addr+(1022*8))) == 0xd010d010) ||
+            (*((uint64_t *)(recv_queue->work_list[tmp]->addr+(1023*8))) == 0xd010d010)){ //possible performance improvement here!
 
-            //*(uint64_t *)((recv_queue->work_list[tmp]->addr)+(1022*8)) = 0x0;
+            *(uint64_t *)((recv_queue->work_list[tmp]->addr)+(1022*8)) = 0x0;
             *(uint64_t *)((recv_queue->work_list[tmp]->addr)+(1023*8)) = 0x0;
             tmp = (tmp+1)%64;
             index = __get_recv_index(recv_queue);
@@ -589,7 +590,6 @@ static int __init axidma_init(void)
     int ret, size;
     int nents;
     PCNPRINTK("Initializing module over AXI\n");
-    pr_info("smp_processor_id %d\n", smp_processor_id());
     pcn_kmsg_set_transport(&transport_pcie_axi);
     PCNPRINTK("registered transport layer\n");
 
