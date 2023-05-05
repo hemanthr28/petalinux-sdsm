@@ -62,16 +62,12 @@ static dma_addr_t h2c_poll_bus;
 static void *base_addr; 
 static dma_addr_t base_dma;
 static dma_addr_t iommu_handle;
-u64 st_pollthrd, et_pollthrd, avg_pollthrd, st_procmsg, et_procmsg, avg_procmsg;
-int cnt_pollthrd=1, cnt_procmsg=1;
 
 static struct iommu_domain *domain; 
 
 static unsigned long total = 0;
 static unsigned long actual = 0;
 static unsigned long no_of_messages = 0;
-
-u64 start_time, end_time, res_time, end_time1, end_time2; 
 
 static unsigned int use_rb_thr = PAGE_SIZE / 2;
 
@@ -138,9 +134,6 @@ enum {
 static int page_ix = 0;
 static int nid;
 static int base_index = 0;
-
-static ktime_t start_s, start_w, end_s, end_w;
-s64 actual_time_w, actual_time_s; 
 static int KV[XDMA_SLOTS];//array of size 320
 
 /* Send Buffer for pcn_kmsg*/
@@ -222,36 +215,10 @@ struct pcie_axi_poll_wb {
 } __packed;
 
 struct axidma_device {
-   // int num_devices;                // The number of devices
-   // unsigned int minor_num;         // The minor number of the device
-   // dev_t dev_num;                  // The device number of the device
     char *chrdev_name;              // The name of the character device
-   // struct device *device;          // Device structure for the char device
-   // struct class *dev_class;        // The device class for the chardevice
-    //struct cdev chrdev;             // The character device structure
-
-   // int num_dma_tx_chans;           // The number of transmit DMA channels
-   // int num_dma_rx_chans;           // The number of receive DMA channels
-   // int num_vdma_tx_chans;          // The number of transmit VDMA channels
-   // int num_vdma_rx_chans;          // The number of receive  VDMA channels
-   // int num_chans;                  // The total number of DMA channels
-   // int notify_signal;              // Signal used to notify transfer completion
     struct platform_device *pdev;   // The platofrm device from the device tree
-   // struct axidma_cb_data *cb_data; // The callback data for each channel
-   // struct axidma_chan *channels;   // All available channels
-   // struct list_head dmabuf_list;   // List of allocated DMA buffers
-   // struct list_head external_dmabufs;  // Buffers allocated in other drivers
-   // void __iomem *base_addr;
 };
 
-//struct axidma_device *axidma_dev, *x86_bus, *prot_proc_bus;
-//struct device_node *axidma_dev, *x86_bus, *prot_proc_bus;
-//struct device *dev;
-//struct device_node *x86_host, *prot_proc, *parent;
-//struct resource res1, res2;
-//unsigned long long x86_host_base_addr, prot_proc_base_addr;
-//static void volatile *base_addr;
-//static dma_addr_t base_dma;
 static struct device_node *x86_host, *prot_proc, *parent;
 static struct resource res1, res2;
 static unsigned long long x86_host_base_addr, prot_proc_base_addr;
@@ -288,7 +255,6 @@ static void __update_recv_index(queue_tr *q, int i)
 
     writeq(0x00000000fefefefe, x86_host_addr); //Reset the physical address
     writeq(q->work_list[i]->dma_addr, x86_host_addr); //Update the physical address with next sector address of recv Q
-    //printk("Recv Q address = %llx\n", q->work_list[i]->dma_addr);
 }
 
 static int __get_recv_index(queue_tr *q)
@@ -304,13 +270,6 @@ void process_message(int recv_i)
     struct pcn_kmsg_message *msg;
     msg = recv_queue->work_list[recv_i]->addr;
     pcn_kmsg_process(msg);
-    /*
-    if (msg->header.type < 0 || msg->header.type >= PCN_KMSG_TYPE_MAX) {
-        printk("Need to call a process function\n");
-        //pcn_kmsg_pcie_axi_process(PCN_KMSG_TYPE_PROT_PROC_REQUEST, recv_queue->work_list[recv_i]->addr);  
-    } else {
-        pcn_kmsg_process(msg);
-    }*/
 }
 
 static struct send_work *__get_send_work(int index) 
@@ -335,40 +294,23 @@ static int poll_dma(void* arg0)
     bool was_frozen;
     int i;
     int recv_index = 0, index = 0, tmp = 0;
-    //printk("In poll_dma\n");
     while (!kthread_freezable_should_stop(&was_frozen)) {
 
         //rcu_read_lock();
-        st_pollthrd = ktime_get_ns();
         if ((*((uint64_t *)(recv_queue->work_list[tmp]->addr+(1022*8))) == 0xd010d010) ||
             (*((uint64_t *)(recv_queue->work_list[tmp]->addr+(1023*8))) == 0xd010d010)){ //possible performance improvement here!
-            
-            et_pollthrd = ktime_get_ns();
-            avg_pollthrd += ktime_to_ns(ktime_sub(et_pollthrd, st_pollthrd));
-            printk("Time to detect the msg = %lld ns\n", avg_pollthrd/cnt_pollthrd);
-            cnt_pollthrd += 1;
 
             *(uint64_t *)((recv_queue->work_list[tmp]->addr)+(1022*8)) = 0x0;
             *(uint64_t *)((recv_queue->work_list[tmp]->addr)+(1023*8)) = 0x0;
             tmp = (tmp+1)%64;
             index = __get_recv_index(recv_queue);
             __update_recv_index(recv_queue, index + 1);
-            //printk("index=%d\n",index);
             recv_index = recv_queue->size;
-            //poll_c2h_wb->completed_desc_count = 0;
-            //counter_rx = 0;
             recv_queue->size += 1;
             if (recv_queue->size == recv_queue->nr_entries) {
                 recv_queue->size = 0;
             }
-            //st_procmsg = ktime_get_ns();
             process_message(recv_index);
-            //et_procmsg = ktime_get_ns();
-            //avg_procmsg += ktime_to_ns(ktime_sub(et_procmsg, st_procmsg));
-            //printk("Time to process kmg = %lld ns\n", avg_procmsg/cnt_procmsg);
-            //cnt_procmsg += 1;
-
-            //printk("Processed popcorn message.\n");
         } else if (h2c_desc_complete != 0) {
             no_of_messages += 1;
             h2c_desc_complete = 0;
@@ -459,8 +401,6 @@ static __init queue_tr* __setup_recv_buffer(int entries)
         recv_q->work_list[i]->addr = base_addr +  FDSM_MSG_SIZE * base_index;
         recv_q->work_list[i]->dma_addr = base_dma + FDSM_MSG_SIZE * base_index;
         ++base_index;
-        //printk("Recv Q addr=%llx\n",virt_to_phys(recv_q->work_list[i]->addr));
-        //printk("Recv Q dma_addr=%llx\n",recv_q->work_list[i]->dma_addr);
     }
     __update_recv_index(recv_q, 0);
     return recv_q;
@@ -535,26 +475,13 @@ void pcie_axi_kmsg_stat(struct seq_file *seq, void *v)
 int pcie_axi_kmsg_post(int nid, struct pcn_kmsg_message *msg, size_t size)
 {
     int ret, i;
-    u64 st_post, et_post, avg_post;
-    int cnt_post=1;
-    //printk("In post\n");
     if (radix_tree_lookup(&send_tree, (unsigned long)((unsigned long *)msg))) {
         spin_lock(&pcie_axi_lock);
-        //st_post = ktime_get_ns();
         for(i=0; i<((FDSM_MSG_SIZE/8)-1); i++){
-            //writeq(*(u64 *)(radix_tree_lookup(&send_tree, (unsigned long)((unsigned long *)msg))+(i*8)), (x86_host_addr + (i*8)));
             __raw_writeq(*(u64 *)(radix_tree_lookup(&send_tree, (unsigned long)((unsigned long *)msg))+(i*8)), (x86_host_addr + (i*8)));
-            //udelay(2);
-            //writeq(*(dma_addr_pntr+(i*8)), x86_host_addr + (i*8));
         }
         __raw_writeq(0xd010d010, x86_host_addr+(1023*8)); //Write the last 2 bytes with a patter to indicate the polling thread.
-        //et_post = ktime_get_ns();
-        //avg_post += ktime_to_ns(ktime_sub(et_post, st_post));
-        //printk("Time to post msg = %lld ns\n", avg_post/cnt_post);
-        //cnt_post += 1;
-
         spin_unlock(&pcie_axi_lock);
-        //printk("Data Sent\n");
         h2c_desc_complete = 1;
     } else {
         printk("DMA addr: not found\n");
@@ -568,7 +495,6 @@ int pcie_axi_kmsg_send(int nid, struct pcn_kmsg_message *msg, size_t size)//0,
     int ret, i;
     u64 st_send, et_send, avg_send;
     int cnt_send=1;
-    //printk("In pcie_axi_kmsg_send\n");
     DECLARE_COMPLETION_ONSTACK(done);
 
     work = __get_send_work(send_queue->tail);
@@ -577,19 +503,11 @@ int pcie_axi_kmsg_send(int nid, struct pcn_kmsg_message *msg, size_t size)//0,
 
     work->done = &done;
     spin_lock(&pcie_axi_lock);
-    //st_send = ktime_get_ns();
     for(i=0; i<((FDSM_MSG_SIZE/8)-1); i++){ 
-            //writeq(*(u64 *)((work->addr)+(i*8)), (x86_host_addr+(i*8)));
             __raw_writeq(*(u64 *)((work->addr)+(i*8)), (x86_host_addr+(i*8)));
-            //udelay(2);
         }
     __raw_writeq(0xd010d010, x86_host_addr+(1023*8)); //Write the last 2 bytes with a patter to indicate the polling thread.
-    //et_send = ktime_get_ns();
-    //avg_send += ktime_to_ns(ktime_sub(et_send, st_send));
-    //printk("Time to post msg = %lld ns\n", avg_send/cnt_send);
-    //cnt_send += 1;
     spin_unlock(&pcie_axi_lock);
-    //printk("Message sent\n");
     h2c_desc_complete = 1;
     
     __process_sent(work);
