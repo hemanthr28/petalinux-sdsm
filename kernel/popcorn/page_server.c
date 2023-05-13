@@ -40,6 +40,11 @@
 
 #include "trace_events.h"
 
+u64 start_time, end_time, res_time;
+static u64 gpf_time = 0;
+static unsigned long no_of_gpf = 0;
+static unsigned long no_of_pages_sent = 0;
+
 inline void page_server_start_mm_fault(unsigned long address)
 {
 #ifdef CONFIG_POPCORN_STAT_PGFAULTS
@@ -1298,9 +1303,11 @@ static int __handle_remotefault_at_remote(struct task_struct *tsk, struct mm_str
 	} else {
 		paddr = kmap_atomic(page);
 		copy_from_user_page(vma, page, addr, res->page, paddr, PAGE_SIZE);
+		no_of_pages_sent += 1;
 		kunmap_atomic(paddr);
 	}
 
+	printk("Number of pages sent = %ld\n", no_of_pages_sent);
 	__finish_fault_handling(fh);
 	return 0;
 }
@@ -1888,7 +1895,7 @@ int page_server_handle_pte_fault(struct vm_fault *vmf)
 {
 	unsigned long addr = vmf->address & PAGE_MASK;
 	int ret = 0; 
-
+	end_time = ktime_get_ns();
 	might_sleep();
 
 	PGPRINTK("\n## PAGEFAULT [%d] %lx %c %lx %x %lx\n",
@@ -1900,6 +1907,15 @@ int page_server_handle_pte_fault(struct vm_fault *vmf)
 	/**
 	 * Thread at the origin
 	 */
+	if (!no_of_gpf) {
+		start_time = ktime_get_ns();
+	} else {
+		gpf_time += end_time - start_time;
+		start_time = ktime_get_ns();
+	}
+
+	no_of_gpf += 1;
+
 	if (!current->at_remote) {
 		ret = __handle_localfault_at_origin(vmf);
 		goto out;
@@ -1924,6 +1940,7 @@ int page_server_handle_pte_fault(struct vm_fault *vmf)
 			PGPRINTK("  [%d] locally file-mapped read-only. continue\n",
 					current->pid);
 			ret = VM_FAULT_CONTINUE;
+			no_of_gpf -= 1;
 			goto out;
 		}
 	}
@@ -1948,6 +1965,8 @@ out:
 	trace_pgfault(my_nid, current->pid,
 			fault_for_write(vmf->flags) ? 'W' : 'R',
 			instruction_pointer(current_pt_regs()), addr, ret);
+	printk("Number of gpf = %ld\n", no_of_gpf);
+	printk("gfl Time = %lld\n", gpf_time/no_of_gpf);
 	return ret;
 }
 
