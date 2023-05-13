@@ -44,6 +44,7 @@ u64 start_time, end_time, res_time;
 static u64 gpf_time = 0;
 static unsigned long no_of_gpf = 0;
 static unsigned long no_of_pages_sent = 0;
+static int cnt = 1;
 
 inline void page_server_start_mm_fault(unsigned long address)
 {
@@ -1966,7 +1967,8 @@ out:
 			fault_for_write(vmf->flags) ? 'W' : 'R',
 			instruction_pointer(current_pt_regs()), addr, ret);
 	printk("Number of gpf = %ld\n", no_of_gpf);
-	printk("gfl Time = %lld\n", gpf_time/no_of_gpf);
+	printk("gpf Time = %lld\n", gpf_time/cnt);
+	cnt+=1;
 	return ret;
 }
 
