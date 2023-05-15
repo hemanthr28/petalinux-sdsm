@@ -45,6 +45,8 @@ static u64 gpf_time = 0;
 static unsigned long no_of_gpf = 0;
 static unsigned long no_of_pages_sent = 0;
 static int cnt = 1;
+static unsigned long rpr_cnt = 0;
+static unsigned long inval_cnt = 0;
 
 inline void page_server_start_mm_fault(unsigned long address)
 {
@@ -895,6 +897,8 @@ static void process_page_invalidate_request(struct work_struct *work)
 	}
 
 	__do_invalidate_page(tsk, req);
+	inval_cnt += 1;
+	printk("Invalidated page count = %ld\n", inval_cnt);
 
 	PGPRINTK(">>[%d] ->[%d/%d]\n", req->remote_pid, res->origin_pid,
 			PCN_KMSG_FROM_NID(req));
